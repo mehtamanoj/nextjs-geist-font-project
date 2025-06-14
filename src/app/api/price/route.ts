@@ -3,26 +3,33 @@ import { tradeData } from '@/lib/tradeData'
 
 // Base price and scaling factors
 const BASE_PRICE = 100
-const PRICE_SCALE = 10000
-const TIME_SCALE = 300000 // 5 minutes in milliseconds
+const VOLATILITY = 0.02 // 2% volatility
+const TRADE_IMPACT = 0.001 // 0.1% price impact per trade
+const TREND_FACTOR = 0.3 // 30% trend influence
+
+let lastPrice = BASE_PRICE
+let trend = 0 // Range: -1 to 1
 
 function calculateNewPrice(): number {
   try {
-    // Get current timestamp
-    const timestamp = Date.now()
+    // Update trend (slowly shifts between bearish and bullish)
+    trend = Math.max(-1, Math.min(1, trend + (Math.random() - 0.5) * 0.1))
     
-    // Calculate price based on time and trade data
-    const timeComponent = Math.sin(timestamp / TIME_SCALE) * 2
+    // Calculate trade pressure (sells push price down, buys push price up)
+    const tradePressure = (tradeData.totalSellValue - tradeData.totalBuyValue) * TRADE_IMPACT
     
-    // Calculate price adjustment based on net trading value
-    const netValue = tradeData.totalBuyValue - tradeData.totalSellValue
-    const tradeComponent = netValue / PRICE_SCALE
+    // Random volatility component
+    const volatility = (Math.random() - 0.5) * 2 * VOLATILITY * lastPrice
     
-    // Calculate new price using base price and components
-    const newPrice = BASE_PRICE + timeComponent + tradeComponent
-
-    // Ensure price doesn't go below minimum value
-    return Math.max(newPrice, 0.01)
+    // Trend component
+    const trendComponent = trend * TREND_FACTOR
+    
+    // Calculate price change
+    const priceChange = volatility + tradePressure + trendComponent
+    
+    // Update and return new price
+    lastPrice = Math.max(lastPrice * (1 + priceChange), 0.01)
+    return lastPrice
   } catch (error) {
     console.error('Error calculating price:', error)
     return BASE_PRICE // Return base price as fallback
