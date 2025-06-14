@@ -3,10 +3,10 @@ import { tradeData } from '@/lib/tradeData'
 
 // Base price and scaling factors
 const BASE_PRICE = 100
-const VOLATILITY = 0.005 // 0.5% volatility
+const VOLATILITY = 0.003 // 0.3% volatility
 const TRADE_IMPACT = 0.0005 // 0.05% price impact per trade
-const TREND_FACTOR = 0.1 // 10% trend influence
-const MEAN_REVERSION = 0.01 // 1% mean reversion factor
+const TREND_FACTOR = 0.05 // 5% trend influence
+const MEAN_REVERSION = 0.02 // 2% mean reversion factor
 
 let lastPrice = BASE_PRICE
 let trend = 0 // Range: -1 to 1
@@ -16,8 +16,8 @@ function calculateNewPrice(): number {
     // Update trend (slowly shifts between bearish and bullish)
     trend = Math.max(-1, Math.min(1, trend + (Math.random() - 0.5) * 0.05))
     
-    // Calculate trade pressure (sells push price down more than buys push up)
-    const tradePressure = (tradeData.totalSellValue - tradeData.totalBuyValue * 0.8) * TRADE_IMPACT
+    // Calculate trade pressure (sells have 50% more impact than buys)
+    const tradePressure = (tradeData.totalSellValue * 1.5 - tradeData.totalBuyValue) * TRADE_IMPACT
     
     // Random volatility component
     const volatility = (Math.random() - 0.5) * 2 * VOLATILITY * lastPrice
@@ -32,7 +32,7 @@ function calculateNewPrice(): number {
     const priceChange = volatility + tradePressure + trendComponent + meanReversion
     
     // Update and return new price
-    lastPrice = Math.max(lastPrice * (1 + priceChange), BASE_PRICE * 0.5)
+    lastPrice = Math.max(lastPrice * (1 + priceChange), BASE_PRICE * 0.8)
     return lastPrice
   } catch (error) {
     console.error('Error calculating price:', error)
