@@ -1,26 +1,19 @@
 import { NextResponse } from 'next/server'
 import { tradeData } from '@/lib/tradeData'
-
-interface Portfolio {
-  shares: number
-  avgPrice: number
-}
-
-interface UserData {
-  walletBalance: number
-  portfolio: Portfolio
-  tradeHistory: any[]
-}
-
-const userData: UserData = {
-  walletBalance: 10000,
-  portfolio: { shares: 0, avgPrice: 0 },
-  tradeHistory: [],
-}
+import { getUserData, updateUserData } from '@/lib/userData'
 
 export async function POST(req: Request) {
   try {
+    // Get mobile number from URL
+    const url = new URL(req.url)
+    const mobile = url.searchParams.get('mobile')
+
+    if (!mobile) {
+      return NextResponse.json({ success: false, error: 'Mobile number is required' }, { status: 400 })
+    }
+
     const { type, quantity, price } = await req.json()
+    const userData = getUserData(mobile)
 
     if (type === 'buy') {
       const totalCost = quantity * price
@@ -62,6 +55,9 @@ export async function POST(req: Request) {
       userData.tradeHistory.push({ type, quantity, price, profit: tradeProfit, timestamp: new Date() })
     }
 
+    // Update user data in store
+    updateUserData(mobile, userData)
+
     return NextResponse.json({
       success: true,
       walletBalance: userData.walletBalance,
@@ -74,8 +70,19 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Get mobile number from URL
+  const url = new URL(req.url)
+  const mobile = url.searchParams.get('mobile')
+
+  if (!mobile) {
+    return NextResponse.json({ success: false, error: 'Mobile number is required' }, { status: 400 })
+  }
+
+  const userData = getUserData(mobile)
+
   return NextResponse.json({
+    success: true,
     walletBalance: userData.walletBalance,
     portfolio: userData.portfolio,
     tradeHistory: userData.tradeHistory,

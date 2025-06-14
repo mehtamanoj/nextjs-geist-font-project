@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from 'next/navigation'
 import { PriceChart } from "./trading/components/PriceChart"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,12 +9,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-
-// Types
-interface Portfolio {
-  shares: number
-  avgPrice: number
-}
 
 interface TradeRecord {
   type: "buy" | "sell"
@@ -23,17 +18,36 @@ interface TradeRecord {
   profit?: number
 }
 
-// Utility function for random price generation
-const generateRandomPrice = (currentPrice: number): number => {
-  const fluctuation = (Math.random() - 0.5) * 2 // Random value between -1 and 1
-  const newPrice = currentPrice + fluctuation
-  return Math.max(newPrice, 0.01) // Ensure price doesn't go below $0.01
-}
-
 export default function TradingGame() {
+  const searchParams = useSearchParams()
+  const mobile = searchParams.get('mobile')
+
   // State management
   const [currentPrice, setCurrentPrice] = useState<number>(100)
   const [priceHistory, setPriceHistory] = useState<{ time: Date; price: number }[]>([])
+  const [walletBalance, setWalletBalance] = useState<number>(10000)
+  const [portfolio, setPortfolio] = useState<{ shares: number; avgPrice: number }>({ shares: 0, avgPrice: 0 })
+  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>([])
+  const [globalStats, setGlobalStats] = useState<{ globalHouseProfit: number }>({ globalHouseProfit: 0 })
+  const [error, setError] = useState<string>("")
+  const [tradeQuantity, setTradeQuantity] = useState<string>("")
+  const [isTradeModalOpen, setIsTradeModalOpen] = useState<boolean>(false)
+  const [tradeType, setTradeType] = useState<"buy" | "sell">("buy")
+
+  // Show error if mobile number is not provided
+  if (!mobile) {
+    return (
+      <main className="min-h-screen bg-black text-white p-4 md:p-8">
+        <div className="max-w-7xl mx-auto">
+          <Alert variant="destructive">
+            <AlertDescription>
+              Please provide a mobile number in the URL (e.g., ?mobile=9929999022)
+            </AlertDescription>
+          </Alert>
+        </div>
+      </main>
+    )
+  }
 
   // Subscribe to SSE price updates
   useEffect(() => {
@@ -50,40 +64,27 @@ export default function TradingGame() {
       eventSource.close()
     }
   }, [])
-  const [walletBalance, setWalletBalance] = useState<number>(10000) // Start with $10,000
-  const [portfolio, setPortfolio] = useState<Portfolio>({ shares: 0, avgPrice: 0 })
-  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>([])
-  const [globalStats, setGlobalStats] = useState<{
-    globalHouseProfit: number
-    totalTrades: number
-    totalVolume: number
-  }>({
-    globalHouseProfit: 0,
-    totalTrades: 0,
-    totalVolume: 0
-  })
-  const [error, setError] = useState<string>("")
-  const [tradeQuantity, setTradeQuantity] = useState<string>("")
-  const [isTradeModalOpen, setIsTradeModalOpen] = useState<boolean>(false)
-  const [tradeType, setTradeType] = useState<"buy" | "sell">("buy")
 
-  // Fetch initial global stats
+  // Fetch initial user data
   useEffect(() => {
-    const fetchGlobalStats = async () => {
+    const fetchUserData = async () => {
       try {
-        const response = await fetch('/api/trades')
+        const response = await fetch(`/api/trades?mobile=${mobile}`)
         if (response.ok) {
           const data = await response.json()
-          setGlobalStats(data)
+          if (data.success) {
+            setWalletBalance(data.walletBalance)
+            setPortfolio(data.portfolio)
+            setTradeHistory(data.tradeHistory)
+            setGlobalStats({ globalHouseProfit: data.globalHouseProfit })
+          }
         }
       } catch (err) {
-        console.error('Error fetching global stats:', err)
+        console.error('Error fetching user data:', err)
       }
     }
-    fetchGlobalStats()
-  }, [])
-
-
+    fetchUserData()
+  }, [mobile])
 
   // Trade execution handlers
   const handleTrade = async () => {
@@ -95,7 +96,7 @@ export default function TradingGame() {
     }
 
     try {
-      const response = await fetch('/api/trades', {
+      const response = await fetch(`/api/trades?mobile=${mobile}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,6 +143,7 @@ export default function TradingGame() {
             Trade stocks in real-time with simulated market prices. Buy low, sell high, and watch your portfolio grow. 
             Remember: the house takes 20% of your profits on successful trades!
           </p>
+          <p className="text-blue-500">User: {mobile}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
